@@ -502,7 +502,7 @@ public class Neo4jSpatialDataStore extends AbstractDataStore implements
 	}
 
 	protected FeatureReader<SimpleFeatureType, SimpleFeature> getFeatureReader(
-			String typeName, SearchQuery search) throws IOException {
+			String typeName, Search search) throws IOException {
 		Layer layer = spatialDatabase.getLayer(typeName);
 		layer.getIndex().executeSearch(search);
 		Iterator<SpatialDatabaseRecord> results = search.getResults()
