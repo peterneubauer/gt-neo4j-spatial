@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.geotools.data.AbstractDataStoreFactory;
-import org.geotools.data.DataSourceException;
 import org.geotools.data.DataStore;
 import org.geotools.util.KVP;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -49,7 +48,7 @@ public class Neo4jSpatialDataStoreFactory extends AbstractDataStoreFactory
 			"must be 'neo4j'", true, "neo4j", new KVP(Param.LEVEL, "program"));
 
 	/**
-	 * Creates a new instance of PostgisDataStoreFactory
+	 * Creates a new instance of Neo4jSpatialDataStoreFactory
 	 */
 	public Neo4jSpatialDataStoreFactory() {
 	}
@@ -62,25 +61,7 @@ public class Neo4jSpatialDataStoreFactory extends AbstractDataStoreFactory
 		}
 	}
 
-	/**
-	 * Construct a postgis data store using the params.
-	 * 
-	 * @param params
-	 *            The full set of information needed to construct a live data
-	 *            source. Should have dbtype equal to postgis, as well as host,
-	 *            user, passwd, database, and table.
-	 * 
-	 * @return The created DataSource, this may be null if the required resource
-	 *         was not found or if insufficent parameters were given. Note that
-	 *         canProcess() should have returned false if the problem is to do
-	 *         with insuficent parameters.
-	 * 
-	 * @throws IOException
-	 *             See DataSourceException
-	 * @throws DataSourceException
-	 *             Thrown if there were any problems creating or connecting the
-	 *             datasource.
-	 */
+	
 	public DataStore createDataStore(Map params) throws IOException {
 
 		if (!canProcess(params)) {
@@ -95,32 +76,31 @@ public class Neo4jSpatialDataStoreFactory extends AbstractDataStoreFactory
 		return dataStore;
 	}
 
-	/**
-	 * Postgis cannot create a new database.
-	 * 
-	 * @param params
-	 * 
-	 * 
-	 * @throws IOException
-	 *             See UnsupportedOperationException
-	 * @throws UnsupportedOperationException
-	 *             Cannot create new database
-	 */
 	public DataStore createNewDataStore(Map params) throws IOException {
 		throw new UnsupportedOperationException(
 				"Neo4j Spatial cannot create a new database!");
 	}
 
+	
+	/**
+	 * 
+	 */
 	public String getDisplayName() {
 		return "Neo4j Spatial";
 	}
 
 
+	/**
+	 * 
+	 */
 	public String getDescription() {
 		return "Neo4j Spatial database";
 	}
 
 
+	/**
+	 * 
+	 */
 	public boolean isAvailable() {
 		return true;
 	}

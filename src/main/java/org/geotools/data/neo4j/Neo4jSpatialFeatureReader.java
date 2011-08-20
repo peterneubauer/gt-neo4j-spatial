@@ -40,7 +40,7 @@ import org.opengis.feature.simple.SimpleFeatureType;
  */
 public class Neo4jSpatialFeatureReader implements FeatureReader<SimpleFeatureType, SimpleFeature> {
 	
-    private static final Logger LOG = Logger.getLogger(Neo4jSpatialFeatureReader.class.getName());
+    private static final Logger log = Logger.getLogger(Neo4jSpatialFeatureReader.class.getName());
 	protected static final String FEATURE_PROP_GEOM = "the_geom";
 
 	private Layer layer;
@@ -57,8 +57,6 @@ public class Neo4jSpatialFeatureReader implements FeatureReader<SimpleFeatureTyp
 	 */
 	public Neo4jSpatialFeatureReader(Layer layer, SimpleFeatureType featureType, Iterator<SpatialDatabaseRecord> results) {
 		
-		System.out.println("TESTTEST");
-		LOG.info("TESTESTESTESTSET");
 		this.layer = layer;
 		this.extraPropertyNames = layer.getExtraPropertyNames();		
 		this.featureType = featureType;
@@ -66,15 +64,24 @@ public class Neo4jSpatialFeatureReader implements FeatureReader<SimpleFeatureTyp
 		this.results = results;
 	}
 	
-	
+	/**
+	 * 
+	 * 
+	 */
 	public SimpleFeatureType getFeatureType() {
 		return featureType;
 	}
 
+	/**
+	 * 
+	 */
 	public boolean hasNext() throws IOException {
 		return results != null && results.hasNext();
 	}
 
+	/**
+	 * 
+	 */
 	public SimpleFeature next() throws IOException, IllegalArgumentException, NoSuchElementException {
 		if (results == null) return null;
 		
@@ -95,12 +102,20 @@ public class Neo4jSpatialFeatureReader implements FeatureReader<SimpleFeatureTyp
 	    return builder.buildFeature(Long.toString(record.getId()));						
 	}
 	
+	/**
+	 * 
+	 */
 	public void close() throws IOException {
+		log.debug("");
 		featureType = null;
 		builder = null;
 		results = null;
 	}
 	
+	/**
+	 * 
+	 * @return
+	 */
 	protected Layer getLayer() {
 		return layer;
 	}
