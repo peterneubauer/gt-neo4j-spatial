@@ -1,0 +1,14 @@
+Tested with: GeoServer 2.1.1
+
+== Building ==
+
+[source]
+----
+mvn clean package
+----
+
+== Deployment into Geoserver ==
+
+* unzip the +target/xxxx-geoserver-plugin.zip+ into $GEOSERVER_HOME/webapps/geoserver/WEB-INF/lib
+
+* restart geoserver
