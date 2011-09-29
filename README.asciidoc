@@ -59,10 +59,11 @@ mvn jetty:run
     </profile>
 ----
 
-* start thw webapp again
+* start the GeoServer webapp again with the added neo4j profile
+
 ----
 cd $GEOSERVER_SRC/src/web/app
-mvn jetty:run
+mvn jetty:run -Pneo4j
 ----
 
 * find Neo4j installed as a datasource under http://localhost:8080
