@@ -7,7 +7,7 @@ Tested with: GeoServer 2.1.1
 == Building ==
 
 ----
-mvn clean package
+mvn clean install
 ----
 
 == Deployment into Geoserver ==
