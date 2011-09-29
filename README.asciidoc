@@ -44,7 +44,7 @@ cd src/web/app
 mvn jetty:run
 ----
 
-* in $GEOSERVER_SOURCE/src/web/app/pom.xml, add the following lines under the profiles section:
+* in $GEOSERVER_SOURCE/src/web/app/pom.xml (https://svn.codehaus.org/geoserver/trunk/src/web/app/pom.xml), add the following lines under the profiles section:
 
 ----
     <profile>
