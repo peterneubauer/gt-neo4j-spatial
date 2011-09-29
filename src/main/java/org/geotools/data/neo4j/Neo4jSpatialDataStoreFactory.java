@@ -91,7 +91,7 @@ public class Neo4jSpatialDataStoreFactory extends AbstractDataStoreFactory
 	 * 
 	 */
 	public String getDisplayName() {
-		return "Neo4j Spatial";
+		return "Neo4j";
 	}
 
 
@@ -99,7 +99,7 @@ public class Neo4jSpatialDataStoreFactory extends AbstractDataStoreFactory
 	 * 
 	 */
 	public String getDescription() {
-		return "Neo4j Spatial database";
+		return "A datasource backed by a Neo4j Spatial datasource";
 	}
 
 

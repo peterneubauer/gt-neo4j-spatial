@@ -15,3 +15,9 @@ mvn clean package
 * unzip the +target/xxxx-geoserver-plugin.zip+ into $GEOSERVER_HOME/webapps/geoserver/WEB-INF/lib
 
 * restart geoserver
+
+* configure a new workspace
+
+* configure a new datasource neo4j in your workspace. Point the "The directory path of the Neo4j database:" parameter to the relative (form the GeoServer working dir) or aboslute path to a Neo4j Spatial database with layers (see https://github.com/neo4j/spatial[Neo4j Spatial])
+
+* in Layers, do "Add new resource" and choose your Neo4j datastore to see the exisitng Neo4j Spatial layers and add them.
