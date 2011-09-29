@@ -1,8 +1,11 @@
+Neo4j Spatial Geoserver Plugin
+==============================
+
+[IMPORTANT]
 Tested with: GeoServer 2.1.1
 
 == Building ==
 
-[source]
 ----
 mvn clean package
 ----
