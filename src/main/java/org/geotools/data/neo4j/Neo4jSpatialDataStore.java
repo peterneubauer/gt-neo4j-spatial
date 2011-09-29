@@ -121,6 +121,7 @@ public class Neo4jSpatialDataStore extends AbstractDataStore implements Constant
             String[] allTypeNames = spatialDatabase.getLayerNames();
             for (int i = 0; i < allTypeNames.length; i++) {
                 // discard empty layers
+                System.out.print( "loading layer " + allTypeNames[i] );
                 Layer layer = spatialDatabase.getLayer(allTypeNames[i]);
                 if (!layer.getIndex().isEmpty()) {
                     notEmptyTypes.add(allTypeNames[i]);
@@ -277,7 +278,7 @@ public class Neo4jSpatialDataStore extends AbstractDataStore implements Constant
 			} catch (UnsupportedOperationException e) {
 				// this is for backward compatibility
 				try {
-					writer = getFeatureWriter(typeName);
+					writer = getFeatureWriter(typeName, transaction);
 				} catch (UnsupportedOperationException eek) {
 					throw e; // throw original - our fallback did not work
 				}

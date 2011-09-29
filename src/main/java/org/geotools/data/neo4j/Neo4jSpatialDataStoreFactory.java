@@ -54,11 +54,16 @@ public class Neo4jSpatialDataStoreFactory extends AbstractDataStoreFactory
 	}
 
 	public boolean canProcess(Map params) {
-		if (!(((String) params.get("dbtype")).equalsIgnoreCase("neo4j"))) {
-			return (false);
-		} else {
-			return (true);
-		}
+	    String type = (String) params.get("dbtype");
+	    if(type != null)
+        {
+            if (!(type.equalsIgnoreCase("neo4j"))) {
+            	return false;
+            } else {
+            	return true;
+            }
+        }
+	    return false;
 	}
 
 	
