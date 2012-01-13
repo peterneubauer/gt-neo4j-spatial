@@ -99,7 +99,7 @@ public class Neo4jSpatialFeatureReader implements FeatureReader<SimpleFeatureTyp
 	    	}
 	    }
 	        
-	    return builder.buildFeature(Long.toString(record.getId()));						
+	    return builder.buildFeature(record.getId());						
 	}
 	
 	/**

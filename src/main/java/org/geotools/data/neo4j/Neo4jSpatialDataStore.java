@@ -45,49 +45,30 @@ import org.geotools.data.Query;
 import org.geotools.data.ResourceInfo;
 import org.geotools.data.TransactionStateDiff;
 import org.geotools.data.simple.SimpleFeatureSource;
-import org.geotools.feature.AttributeTypeBuilder;
-import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
-import org.geotools.feature.type.BasicFeatureTypes;
-import org.geotools.filter.AndImpl;
-import org.geotools.filter.AttributeExpression;
 import org.geotools.filter.FidFilterImpl;
-import org.geotools.filter.LiteralExpression;
-import org.geotools.filter.spatial.IntersectsImpl;
 import org.geotools.geometry.jts.ReferencedEnvelope;
-import org.geotools.resources.Classes;
 import org.geotools.styling.SLDParser;
 import org.geotools.styling.Style;
 import org.geotools.styling.StyleFactory;
 import org.geotools.styling.StyleFactoryImpl;
+import org.neo4j.collections.rtree.filter.SearchAll;
+import org.neo4j.collections.rtree.filter.SearchFilter;
 import org.neo4j.gis.spatial.Constants;
 import org.neo4j.gis.spatial.EditableLayer;
-import org.neo4j.gis.spatial.EnvelopeUtils;
 import org.neo4j.gis.spatial.Layer;
-import org.neo4j.gis.spatial.LayerSearch;
 import org.neo4j.gis.spatial.SpatialDatabaseRecord;
 import org.neo4j.gis.spatial.SpatialDatabaseService;
-import org.neo4j.gis.spatial.query.SearchAll;
-import org.neo4j.gis.spatial.query.SearchIntersect;
-import org.neo4j.gis.spatial.query.SearchIntersectWindow;
+import org.neo4j.gis.spatial.Utilities;
+import org.neo4j.gis.spatial.filter.SearchCQL;
+import org.neo4j.gis.spatial.filter.SearchRecords;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Transaction;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
-import org.opengis.feature.type.AttributeDescriptor;
-import org.opengis.feature.type.GeometryDescriptor;
-import org.opengis.feature.type.GeometryType;
 import org.opengis.filter.Filter;
-import org.opengis.filter.spatial.BBOX;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.geom.MultiLineString;
-import com.vividsolutions.jts.geom.MultiPoint;
-import com.vividsolutions.jts.geom.MultiPolygon;
-import com.vividsolutions.jts.geom.Point;
-import com.vividsolutions.jts.geom.Polygon;
 
 
 /**
@@ -144,33 +125,7 @@ public class Neo4jSpatialDataStore extends AbstractDataStore implements Constant
                 throw new IOException("Layer not found: " + typeName);
             }
 
-            String[] extraPropertyNames = layer.getExtraPropertyNames();
-            List<AttributeDescriptor> types = readAttributes(typeName, extraPropertyNames);
-
-            // find Geometry type
-            SimpleFeatureType parent = null;
-            GeometryDescriptor geomDescriptor = (GeometryDescriptor)types.get(0);
-            Class< ? > geomBinding = geomDescriptor.getType().getBinding();
-            if ((geomBinding == Point.class) || (geomBinding == MultiPoint.class)) {
-                parent = BasicFeatureTypes.POINT;
-            } else if ((geomBinding == Polygon.class) || (geomBinding == MultiPolygon.class)) {
-                parent = BasicFeatureTypes.POLYGON;
-            } else if ((geomBinding == LineString.class) || (geomBinding == MultiLineString.class)) {
-                parent = BasicFeatureTypes.LINE;
-            }
-
-            SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
-            builder.setDefaultGeometry(geomDescriptor.getLocalName());
-            builder.addAll(types);
-            builder.setName(typeName);
-            builder.setNamespaceURI(BasicFeatureTypes.DEFAULT_NAMESPACE);
-            builder.setAbstract(false);
-            builder.setCRS(layer.getCoordinateReferenceSystem());
-            if (parent != null) {
-                builder.setSuperType(parent);
-            }
-
-            result = builder.buildFeatureType();
+            result = Neo4jFeatureBuilder.getTypeFromLayer(layer);
             simpleFeatureTypeIndex.put(typeName, result);
         }
 
@@ -260,8 +215,6 @@ public class Neo4jSpatialDataStore extends AbstractDataStore implements Constant
     } */
         
     public FeatureWriter<SimpleFeatureType, SimpleFeature> getFeatureWriter(String typeName, Filter filter, org.geotools.data.Transaction transaction) throws IOException {
-		System.out.println("getFeatureWriter(" + typeName + "," + filter.getClass() + " " + filter + "," + transaction + ")");
-		
 		if (filter == null) {
 			throw new NullPointerException("getFeatureReader requires Filter: did you mean Filter.INCLUDE?");
         }
@@ -270,6 +223,8 @@ public class Neo4jSpatialDataStore extends AbstractDataStore implements Constant
 			throw new NullPointerException("getFeatureWriter requires Transaction: did you mean to use Transaction.AUTO_COMMIT?");
 		}
 
+		System.out.println("getFeatureWriter(" + typeName + "," + filter.getClass() + " " + filter + "," + transaction + ")");		
+		
 		FeatureWriter<SimpleFeatureType, SimpleFeature> writer;
 
 		if (transaction == org.geotools.data.Transaction.AUTO_COMMIT) {
@@ -306,7 +261,7 @@ public class Neo4jSpatialDataStore extends AbstractDataStore implements Constant
 	public ReferencedEnvelope getBounds(String typeName) {
     	ReferencedEnvelope result = boundsIndex.get(typeName);
     	if (result == null) {
-			Envelope bbox = EnvelopeUtils.fromNeo4jToJts(
+			Envelope bbox = Utilities.fromNeo4jToJts(
 					spatialDatabase.getLayer(typeName).getIndex().getBoundingBox());
 			result = convertEnvelopeToRefEnvelope(typeName, bbox);
 			boundsIndex.put(typeName, result);		
@@ -362,91 +317,23 @@ public class Neo4jSpatialDataStore extends AbstractDataStore implements Constant
 	 * Create an optimized FeatureReader for most of the uDig operations.
 	 */
     protected FeatureReader<SimpleFeatureType, SimpleFeature> getFeatureReader(String typeName, Filter filter) throws IOException {
+    	Layer layer = spatialDatabase.getLayer(typeName);
+    	
+    	Iterator<SpatialDatabaseRecord> records;
     	if (filter.equals(Filter.EXCLUDE)) {
-    		// Filter that excludes everything: create an empty FeatureReader
-			return new Neo4jSpatialFeatureReader(spatialDatabase.getLayer(typeName), getSchema(typeName), null);
-    	} else if (filter instanceof BBOX) {
-			// query used in uDig Zoom and Pan
-			BBOX bbox = (BBOX) filter;
-			return getFeatureReader(typeName, new SearchIntersectWindow(
-					EnvelopeUtils.fromJtsToNeo4j(convertBBoxToEnvelope(bbox))));
-		} else if (filter instanceof IntersectsImpl) {
-			// query used in uDig Point Info
-			IntersectsImpl intersectFilter = (IntersectsImpl) filter;
-			return getFeatureReader(typeName, intersectFilter);
-		} else if (filter instanceof AndImpl) {
-			// query used in uDig Window Info and in uDig editing
-			AndImpl andFilter = (AndImpl) filter;
-			Iterator andFilterChildren = andFilter.getFilterIterator();
-			while (andFilterChildren.hasNext()) {
-				Filter childFilter = (Filter) andFilterChildren.next();
-				if (childFilter instanceof IntersectsImpl) {
-					return getFeatureReader(typeName, (IntersectsImpl) childFilter);
-				} else if (childFilter instanceof BBOX) {
-					return getFeatureReader(typeName, new SearchIntersectWindow(
-							EnvelopeUtils.fromJtsToNeo4j(convertBBoxToEnvelope((BBOX) childFilter))));
-				}
-			}
+    		// filter that excludes everything: create an empty FeatureReader
+			records = null;
 		} else if (filter instanceof FidFilterImpl) {
 			// filter by Feature unique id
-			Layer layer = spatialDatabase.getLayer(typeName);
 			List<SpatialDatabaseRecord> results = layer.getIndex().get(convertToGeomNodeIds((FidFilterImpl) filter));
 			System.out.println("found results for FidFilter: " + results.size());
-			return new Neo4jSpatialFeatureReader(layer, getSchema(typeName), results.iterator());
-		}    	
+			records = results.iterator();
+		} else {
+			records = layer.getIndex().search(new SearchCQL(layer, filter));
+		}
     	
-		System.out.println("optimized reader NOT FOUND :(");   	
-    	return null;
-    }    
-    
-    private FeatureReader<SimpleFeatureType, SimpleFeature> getFeatureReader(String typeName, IntersectsImpl intersectFilter) throws IOException {
-    	// try to create a bbox query
-    	if (intersectFilter.getExpression1() instanceof AttributeExpression && 
-    		intersectFilter.getExpression2() instanceof LiteralExpression) 
-    	{
-    		AttributeExpression exp1 = (AttributeExpression) intersectFilter.getExpression1();
-    		LiteralExpression exp2 = (LiteralExpression) intersectFilter.getExpression2();
-    		if (Neo4jSpatialFeatureReader.FEATURE_PROP_GEOM.equals(exp1.getPropertyName()) && exp2.getValue() instanceof Geometry) {
-    			return getFeatureReader(typeName, new SearchIntersect((Geometry) exp2.getValue()));
-    		}
-    	}
-    	
-		return null;
+		return new Neo4jSpatialFeatureReader(layer, getSchema(typeName), records);
     }
-    
-	protected List<AttributeDescriptor> readAttributes(String typeName, String[] extraPropertyNames) throws IOException {
-    	Class<? extends Geometry> geometryClass = SpatialDatabaseService.convertGeometryTypeToJtsClass(getGeometryType(typeName));
-
-	    AttributeTypeBuilder build = new AttributeTypeBuilder();
-	    build.setName(Classes.getShortName(geometryClass));
-	    build.setNillable(true);
-	    build.setCRS(getCRS(typeName));
-	    build.setBinding(geometryClass);
-	
-	    GeometryType geometryType = build.buildGeometryType();
-	        
-	    List<AttributeDescriptor> attributes = new ArrayList<AttributeDescriptor>();
-	    attributes.add(build.buildDescriptor(BasicFeatureTypes.GEOMETRY_ATTRIBUTE_NAME, geometryType));
-	    
-	    if (extraPropertyNames != null) {
-		    Set<String> usedNames = new HashSet<String>(); 
-		    // record names in case of duplicates
-	        usedNames.add(BasicFeatureTypes.GEOMETRY_ATTRIBUTE_NAME);
-	
-			for (String propertyName : extraPropertyNames) {
-				if (!usedNames.contains(propertyName)) {
-					usedNames.add(propertyName);
-
-					build.setNillable(true);
-					build.setBinding(String.class);
-
-					attributes.add(build.buildDescriptor(propertyName));
-				}
-			}
-	    }
-	    
-        return attributes;
-    }    
     
     protected ResourceInfo getInfo(String typeName) {
     	return new DefaultResourceInfo(typeName, getCRS(typeName), getBounds(typeName));
@@ -460,19 +347,14 @@ public class Neo4jSpatialDataStore extends AbstractDataStore implements Constant
 		return getFeatureReader(typeName, new SearchAll());
 	}
 	
-    protected FeatureReader<SimpleFeatureType, SimpleFeature> getFeatureReader(String typeName, LayerSearch search) throws IOException {
+    private FeatureReader<SimpleFeatureType, SimpleFeature> getFeatureReader(String typeName, SearchFilter search) throws IOException {
     	Layer layer = spatialDatabase.getLayer(typeName);		
-    	layer.getIndex().executeSearch(search);
-    	Iterator<SpatialDatabaseRecord> results = search.getExtendedResults().iterator();
+    	SearchRecords results = layer.getIndex().search(search);
     	return new Neo4jSpatialFeatureReader(layer, getSchema(typeName), results);
     }
 		
     private ReferencedEnvelope convertEnvelopeToRefEnvelope(String typeName, Envelope bbox) {
     	return new ReferencedEnvelope(bbox, getCRS(typeName));
-    }
-    
-    private Envelope convertBBoxToEnvelope(BBOX bbox) {
-    	return new Envelope(bbox.getMinX(), bbox.getMaxX(), bbox.getMinY(), bbox.getMaxY());
     }
 
     private CoordinateReferenceSystem getCRS(String typeName) {
